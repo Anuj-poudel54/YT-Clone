@@ -251,6 +251,7 @@ const updateUserDetails = asyncHandler(async (req, res) => {
 
 });
 
+// TODO: delete old ☺ image after updating.
 const updateUserAvatar = asyncHandler(async (req, res) => {
 
     const avatarLocalFilePath = req.file?.path;
@@ -281,6 +282,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
 });
 
+// TODO: delete old cover image after updating.
 const updateUserCoverImage = asyncHandler(async (req, res) => {
     const coverImageLocalFilePath = req.file?.path;
 
@@ -308,6 +310,83 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         );
 });
 
+
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+
+    const { username } = req.params;
+    if (!username?.trim()) {
+        throw new ApiError(400, "Username is missing");
+    }
+
+    const channelPrfofileDetail = await User.aggregate([
+        // Getting channel document
+        {
+            $match: {
+                username: username?.toLowerCase()
+            }
+        },
+        // getting subscriber count of the channel
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers"
+            }
+        },
+        // getting subscribed count of the channel
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subscribedTo",
+            }
+        },
+        // Adding those extra count fields
+        {
+            $addFields: {
+                subscriberCount: {
+                    $size: "$subscribers"
+                },
+                subscribedToCount: {
+                    $size: "$subscribedTo"
+                },
+                isSubscribed: {
+                    $condition: {
+                        if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                        then: true,
+                        else: true,
+                    }
+                }
+            },
+        },
+        // Projecting what fields to send
+        {
+            $project: {
+                fullName: 1,
+                usernaem: 1,
+                subscribedToCount: 1,
+                subscriberCount: 1,
+                avatar: 1,
+                coverImage: 1,
+                email: 1,
+            }
+        }
+    ]);
+
+    if (!channelPrfofileDetail?.length) {
+        throw new ApiError(404, "Channel doesnot exists!");
+    }
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, channelPrfofileDetail[0], "User fetched successfully")
+        )
+
+})
+
 export {
     registerUser,
     loginUser,
@@ -318,4 +397,5 @@ export {
     updateUserDetails,
     updateUserAvatar,
     updateUserCoverImage,
+    getUserChannelProfile,
 };
