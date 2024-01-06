@@ -197,4 +197,66 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 })
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    const loggedinUser = req.user; // comes from auth middleware
+    const user = await User.findById(loggedinUser?._id);
+    const isPasswordValid = await user.validatePassword(oldPassword);
+
+    if (!isPasswordValid) {
+        throw new ApiError(400, "Invalid old password");
+    }
+
+    user.password = newPassword;
+    await user.save({ validateBeforeSave: false });
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, {}, "Password changed successfully!")
+        );
+});
+
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, req.user, "Current user fetched!")
+        );
+});
+
+const updateUserDetails = asyncHandler(async (req, res) => {
+    const { fullName, email } = req.body;
+    const currentUser = req.user;
+
+    const user = await User.findByIdAndUpdate(
+        currentUser?._id,
+        {
+            $set: {
+                fullName,
+                email
+            }
+        },
+
+        { new: true }, // returns user with new details
+
+    ).select("-password");
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, user, "Details updated successfully!")
+        );
+
+});
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser,
+    refreshAccessToken,
+    getCurrentUser,
+    changeCurrentPassword,
+    updateUserDetails
+};
